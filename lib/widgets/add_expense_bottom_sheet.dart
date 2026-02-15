@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../models/currency.dart';
+import 'currency_selection_bottom_sheet.dart';
 
 class AddExpenseBottomSheet extends StatefulWidget {
   const AddExpenseBottomSheet({super.key});
@@ -22,6 +24,10 @@ class _AddExpenseBottomSheetState extends State<AddExpenseBottomSheet> {
   
   DateTime _selectedDate = DateTime.now();
   String? _selectedTag;
+  Currency _selectedCurrency = Currency.currencies.firstWhere(
+    (c) => c.code == 'SGD',
+    orElse: () => Currency.currencies.first,
+  );
   final List<String> _defaultTags = [
     'Food',
     'Transport',
@@ -114,6 +120,22 @@ class _AddExpenseBottomSheetState extends State<AddExpenseBottomSheet> {
     }
   }
 
+  Future<void> _selectCurrency(BuildContext context) async {
+    final Currency? selected = await showModalBottomSheet<Currency>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => CurrencySelectionBottomSheet(
+        selectedCurrency: _selectedCurrency,
+      ),
+    );
+    if (selected != null) {
+      setState(() {
+        _selectedCurrency = selected;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
@@ -192,11 +214,54 @@ class _AddExpenseBottomSheetState extends State<AddExpenseBottomSheet> {
                     keyboardType: TextInputType.numberWithOptions(decimal: true),
                     decoration: InputDecoration(
                       hintText: '0.00',
-                      prefixText: '\$ ',
+                      prefixText: '${_selectedCurrency.symbol} ',
                       prefixStyle: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w500,
                         color: Colors.black,
+                      ),
+                      suffixIcon: Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: GestureDetector(
+                          onTap: () => _selectCurrency(context),
+                          child: Container(
+                            margin: const EdgeInsets.all(4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  _selectedCurrency.code,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(
+                                  Icons.arrow_drop_down,
+                                  size: 18,
+                                  color: Colors.black,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                       filled: true,
                       fillColor: const Color(0xFFF5F5F5),
