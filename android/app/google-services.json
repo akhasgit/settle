@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "457646309364",
+    "project_id": "flashcardme-9beb0",
+    "storage_bucket": "flashcardme-9beb0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:457646309364:android:11d1e6cc8ce658d22103a1",
+        "android_client_info": {
+          "package_name": "com.example.settle"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBZSmHezPgo7Tndj4ahw8Saf-nN10yRCUg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
