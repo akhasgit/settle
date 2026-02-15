@@ -187,14 +187,20 @@ class _AddExpenseBottomSheetState extends State<AddExpenseBottomSheet> {
           ),
           // Form content
           Expanded(
-            child: SingleChildScrollView(
-              controller: _scrollController,
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              ),
-              child: Column(
+            child: GestureDetector(
+              onTap: () {
+                // Dismiss keyboard when tapping outside text fields
+                FocusScope.of(context).unfocus();
+              },
+              behavior: HitTestBehavior.opaque,
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                ),
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Spending Amount
@@ -484,6 +490,7 @@ class _AddExpenseBottomSheetState extends State<AddExpenseBottomSheet> {
                     ),
                   ),
                 ],
+                ),
               ),
             ),
           ),

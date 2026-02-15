@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'auth_service.dart';
+import '../services/user_service.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -14,6 +15,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _authService = AuthService();
+  final _userService = UserService();
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
@@ -34,11 +36,40 @@ class _SignUpScreenState extends State<SignUpScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await _authService.signUpWithEmailAndPassword(
+      final credential = await _authService.signUpWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      // Navigation will be handled by auth state listener
+      
+      // Create user document in Firestore (non-blocking)
+      // Don't fail sign-up if Firestore fails - user is already authenticated
+      if (credential?.user != null) {
+        final user = credential!.user!;
+        // Create document in background, don't wait for it
+        _userService.createUserDocument(
+          uid: user.uid,
+          email: user.email ?? _emailController.text.trim(),
+          name: user.displayName, // Will be null/empty if not set
+        ).catchError((error) {
+          // Log error but don't block user sign-up
+          debugPrint('Failed to create user document: $error');
+          // Optionally show a non-blocking message
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Account created, but profile setup may be incomplete. Please check your connection.'),
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        });
+      }
+      
+      // User is now logged in - pop the sign-up screen
+      // AuthWrapper will automatically navigate to MainScreen
+      if (mounted) {
+        Navigator.pop(context);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
