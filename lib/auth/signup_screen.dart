@@ -28,6 +28,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
+
   Future<void> _handleSignUp() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -53,20 +54,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
         ).catchError((error) {
           // Log error but don't block user sign-up
           debugPrint('Failed to create user document: $error');
-          // Optionally show a non-blocking message
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Account created, but profile setup may be incomplete. Please check your connection.'),
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
         });
       }
       
       // User is now logged in - pop the sign-up screen
       // AuthWrapper will automatically navigate to MainScreen
+      // MainScreen will check if profile setup is needed
       if (mounted) {
         Navigator.pop(context);
       }

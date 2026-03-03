@@ -11,6 +11,9 @@ import 'screens/settings_screen.dart';
 import 'auth/login_screen.dart';
 import 'auth/auth_service.dart';
 import 'widgets/add_expense_bottom_sheet.dart';
+import 'widgets/add_savings_bottom_sheet.dart';
+import 'widgets/profile_setup_bottom_sheet.dart';
+import 'services/user_service.dart';
 // TODO: Run 'flutterfire configure' to generate this file
 // import 'firebase_options.dart';
 
@@ -86,11 +89,59 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final _authService = AuthService();
+  final _userService = UserService();
+  final _analyticsKey = GlobalKey<AnalyticsTabState>();
+  bool _hasCheckedProfile = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() => setState(() {}));
+    _checkUserProfile();
+  }
+
+  Future<void> _checkUserProfile() async {
+    // Wait a bit for the screen to render
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    if (!mounted) return;
+    
+    final user = _authService.currentUser;
+    if (user == null) return;
+
+    try {
+      final userDoc = await _userService.getUserDocument(user.uid);
+      final userData = userDoc.data() as Map<String, dynamic>?;
+      
+      final name = userData?['name'] as String? ?? '';
+      final username = userData?['username'] as String? ?? '';
+      
+      final needsProfileSetup = name.isEmpty || username.isEmpty;
+      
+      if (needsProfileSetup && mounted && !_hasCheckedProfile) {
+        _hasCheckedProfile = true;
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          isDismissible: false,
+          enableDrag: false,
+          builder: (context) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: ProfileSetupBottomSheet(
+              uid: user.uid,
+              email: user.email ?? '',
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error checking user profile: $e');
+    }
   }
 
   @override
@@ -148,13 +199,29 @@ class _MainScreenState extends State<MainScreen>
                           ),
                           const SizedBox(width: 8),
                           GestureDetector(
-                            onTap: () {
-                              showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (context) => const AddExpenseBottomSheet(),
-                              );
+                            onTap: () async {
+                              final user = _authService.currentUser;
+                              if (user == null) return;
+                              if (_tabController.index == 1) {
+                                await showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (context) =>
+                                      AddSavingsBottomSheet(uid: user.uid),
+                                );
+                              } else {
+                                final result = await showModalBottomSheet<bool>(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (context) =>
+                                      AddExpenseBottomSheet(uid: user.uid),
+                                );
+                                if (result == true) {
+                                  _analyticsKey.currentState?.invalidateCache();
+                                }
+                              }
                             },
                             child: Container(
                               width: 32,
@@ -175,14 +242,14 @@ class _MainScreenState extends State<MainScreen>
                     ],
                   ),
                 ),
-                // TabBarView for content
+                // IndexedStack keeps all tabs mounted so state and scroll position persist
                 Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: const [
-                      HomeTab(),
-                      SavingsTab(),
-                      AnalyticsTab(),
+                  child: IndexedStack(
+                    index: _tabController.index,
+                    children: [
+                      const HomeTab(),
+                      const SavingsTab(),
+                      AnalyticsTab(key: _analyticsKey),
                     ],
                   ),
                 ),

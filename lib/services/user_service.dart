@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
 class UserService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   UserService() {
     // Configure Firestore settings for better connectivity
@@ -18,12 +21,66 @@ class UserService {
     }
   }
 
+  /// Checks if a username is available.
+  /// If [excludeUid] is set, the username is considered available when it belongs to that user (e.g. they're keeping their current username).
+  Future<bool> isUsernameAvailable(String username, {String? excludeUid}) async {
+    try {
+      // Remove @ if present for query
+      final cleanUsername = username.startsWith('@')
+          ? username.substring(1)
+          : username;
+
+      if (cleanUsername.isEmpty) {
+        return false;
+      }
+
+      final querySnapshot = await _firestore
+          .collection('users')
+          .where('username', isEqualTo: cleanUsername)
+          .limit(1)
+          .get()
+          .timeout(const Duration(seconds: 5));
+
+      if (querySnapshot.docs.isEmpty) return true;
+      if (excludeUid != null && querySnapshot.docs.first.id == excludeUid) {
+        return true; // Current user already has this username
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Error checking username availability: $e');
+      return false;
+    }
+  }
+
+  /// Updates user document with name and username
+  Future<void> updateUserProfile({
+    required String uid,
+    required String name,
+    required String username,
+  }) async {
+    try {
+      // Remove @ if present
+      final cleanUsername = username.startsWith('@') 
+          ? username.substring(1) 
+          : username;
+
+      await _firestore.collection('users').doc(uid).update({
+        'name': name,
+        'username': cleanUsername,
+      });
+    } catch (e) {
+      debugPrint('Error updating user profile: $e');
+      throw 'Failed to update profile: $e';
+    }
+  }
+
   /// Creates a new user document in Firestore with the specified fields
   /// The document ID will be the user's UID
   Future<void> createUserDocument({
     required String uid,
     required String email,
     String? name,
+    String? username,
   }) async {
     try {
       debugPrint('Attempting to create user document for UID: $uid');
@@ -32,9 +89,15 @@ class UserService {
       // Create the user document with all required fields
       // Using set with merge: false to create new document or overwrite if exists
       debugPrint('Creating user document with data...');
+      
+      // Clean username (remove @ if present)
+      final cleanUsername = username != null && username.isNotEmpty
+          ? (username.startsWith('@') ? username.substring(1) : username)
+          : '';
+      
       await userDoc.set({
         'uid': uid,
-        'username': '', // null string as requested
+        'username': cleanUsername,
         'name': name ?? '',
         'email': email,
         'dailyExpense': 0,
@@ -89,6 +152,64 @@ class UserService {
       return await _firestore.collection('users').doc(uid).get();
     } catch (e) {
       throw 'Failed to get user document: $e';
+    }
+  }
+
+  /// Uploads a profile image to Firebase Storage and returns the download URL
+  Future<String> uploadProfileImage({
+    required String uid,
+    required File imageFile,
+  }) async {
+    try {
+      final ext = imageFile.path.split('.').last.toLowerCase();
+      final safeExt = ['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(ext)
+          ? ext
+          : 'jpg';
+      final ref = _storage.ref().child('profile_images').child('$uid.$safeExt');
+      await ref.putFile(
+        imageFile,
+        SettableMetadata(contentType: 'image/$safeExt'),
+      );
+      final downloadUrl = await ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      debugPrint('Error uploading profile image: $e');
+      throw 'Failed to upload profile image: $e';
+    }
+  }
+
+  /// Updates daily, weekly, and monthly budget on the user document
+  Future<void> updateBudgets({
+    required String uid,
+    double? dailyBudget,
+    double? weeklyBudget,
+    double? monthlyBudget,
+  }) async {
+    try {
+      final data = <String, dynamic>{};
+      if (dailyBudget != null) data['dailyBudget'] = dailyBudget;
+      if (weeklyBudget != null) data['weeklyBudget'] = weeklyBudget;
+      if (monthlyBudget != null) data['monthlyBudget'] = monthlyBudget;
+      if (data.isEmpty) return;
+      await _firestore.collection('users').doc(uid).update(data);
+    } catch (e) {
+      debugPrint('Error updating budgets: $e');
+      throw 'Failed to update budgets: $e';
+    }
+  }
+
+  /// Updates the user's profile image URL in Firestore
+  Future<void> updateProfileImageUrl({
+    required String uid,
+    required String imageUrl,
+  }) async {
+    try {
+      await _firestore.collection('users').doc(uid).update({
+        'profileImageUrl': imageUrl,
+      });
+    } catch (e) {
+      debugPrint('Error updating profile image URL: $e');
+      throw 'Failed to update profile image: $e';
     }
   }
 }
