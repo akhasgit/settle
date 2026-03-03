@@ -79,6 +79,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -89,6 +95,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Image.asset(
+                    'lib/assets/applogo.png',
+                    height: 200,
+                    fit: BoxFit.contain,
+                  ),
+                  // const SizedBox(height: 24),
                   const Text(
                     'Create Account',
                     style: TextStyle(

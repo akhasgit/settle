@@ -155,6 +155,11 @@ class UserService {
     }
   }
 
+  /// Stream of user document for real-time profile updates
+  Stream<DocumentSnapshot> userDocumentStream(String uid) {
+    return _firestore.collection('users').doc(uid).snapshots();
+  }
+
   /// Uploads a profile image to Firebase Storage and returns the download URL
   Future<String> uploadProfileImage({
     required String uid,

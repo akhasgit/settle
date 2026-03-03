@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
@@ -8,7 +9,7 @@ import 'screens/home_tab.dart';
 import 'screens/savings_tab.dart';
 import 'screens/analytics_tab.dart';
 import 'screens/settings_screen.dart';
-import 'auth/login_screen.dart';
+import 'auth/auth_choice_screen.dart';
 import 'auth/auth_service.dart';
 import 'widgets/add_expense_bottom_sheet.dart';
 import 'widgets/add_savings_bottom_sheet.dart';
@@ -72,8 +73,8 @@ class AuthWrapper extends StatelessWidget {
           return const MainScreen();
         }
         
-        // If user is not logged in, show login screen
-        return const LoginScreen();
+        // If user is not logged in, show auth choice (login or sign up)
+        return const AuthChoiceScreen();
       },
     );
   }
@@ -152,28 +153,67 @@ class _MainScreenState extends State<MainScreen>
 
   @override
   Widget build(BuildContext context) {
+    final user = _authService.currentUser;
+    if (user == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    final uid = user.uid;
+
     return Scaffold(
       body: Stack(
         children: [
           // Main content with TabBarView
           SafeArea(
-            child: Column(
-              children: [
-                // Top bar with date and add button
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        _formatDate(DateTime.now()),
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w400,
-                          color: Colors.black,
-                        ),
-                      ),
-                      Row(
+            child: StreamBuilder<DocumentSnapshot>(
+              stream: _userService.userDocumentStream(uid),
+              builder: (context, userSnapshot) {
+                final userData =
+                    (userSnapshot.data?.data() as Map<String, dynamic>?) ?? {};
+                final name = userData['name'] as String? ?? '';
+                final username = userData['username'] as String? ?? '';
+                final profileImageUrl =
+                    userData['profileImageUrl'] as String?;
+
+                return Column(
+                  children: [
+                    // Top bar with date, profile picture, and add button
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircleAvatar(
+                                radius: 22,
+                                backgroundColor: Colors.grey.shade200,
+                                backgroundImage: profileImageUrl != null &&
+                                        profileImageUrl.isNotEmpty
+                                    ? NetworkImage(profileImageUrl)
+                                    : null,
+                                child: profileImageUrl == null ||
+                                        profileImageUrl.isEmpty
+                                    ? Icon(
+                                        Icons.person,
+                                        size: 24,
+                                        color: Colors.grey.shade600,
+                                      )
+                                    : null,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                _formatDate(DateTime.now()),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w400,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
                         children: [
                           GestureDetector(
                             onTap: () {
@@ -247,7 +287,7 @@ class _MainScreenState extends State<MainScreen>
                   child: IndexedStack(
                     index: _tabController.index,
                     children: [
-                      const HomeTab(),
+                      HomeTab(name: name, username: username),
                       const SavingsTab(),
                       AnalyticsTab(key: _analyticsKey),
                     ],
@@ -256,6 +296,9 @@ class _MainScreenState extends State<MainScreen>
                 // Spacer to push navigation bar up
                 const SizedBox(height: 20),
               ],
+            
+            );
+              },
             ),
           ),
           // Custom floating glass navigation bar

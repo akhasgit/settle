@@ -5,7 +5,14 @@ import '../widgets/set_budget_bottom_sheet.dart';
 import 'expense_list_screen.dart';
 
 class HomeTab extends StatefulWidget {
-  const HomeTab({super.key});
+  final String name;
+  final String username;
+
+  const HomeTab({
+    super.key,
+    this.name = '',
+    this.username = '',
+  });
 
   @override
   State<HomeTab> createState() => _HomeTabState();
@@ -70,8 +77,33 @@ class _HomeTabState extends State<HomeTab> {
         return SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 8),
+              if (widget.name.isNotEmpty || widget.username.isNotEmpty) ...[
+                Text(
+                  widget.name.isNotEmpty
+                      ? 'Hello, ${widget.name[0].toUpperCase()}${widget.name.length > 1 ? widget.name.substring(1) : ''} 👋🏾'
+                      : 'Hello',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+                if (widget.username.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.username.startsWith('@')
+                        ? widget.username
+                        : '@${widget.username}',
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 20),
+              ],
               GestureDetector(
                 onTap: () => _openExpenseList('Today'),
                 child: _buildSpendCard(
