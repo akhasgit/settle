@@ -62,4 +62,19 @@ class Expense {
       'omittedUsernames': omittedUsernames,
     };
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'amount': amount,
+      'name': name,
+      'tag': tag,
+      'currency': currency,
+      'date': date.toIso8601String(),
+      'splitWith': splitWith,
+      'splitMode': splitMode,
+      'customAmounts': customAmounts,
+      'omittedUsernames': omittedUsernames,
+    };
+  }
 }

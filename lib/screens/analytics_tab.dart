@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 import '../models/expense.dart';
 import '../services/expense_service.dart';
+import 'ai_chat_screen.dart';
+import 'conversation_list_screen.dart';
 
 class _PeriodData {
   final List<Expense> current;
@@ -347,23 +349,95 @@ class AnalyticsTabState extends State<AnalyticsTab>
 
   // ─── Search Card ─────────────────────────────────────────────
 
+  void _openAIChat(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+    _searchController.clear();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => AIChatScreen(initialMessage: trimmed),
+      ),
+    );
+  }
+
+  void _openConversationHistory() {
+    Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (context) => const ConversationListScreen(),
+      ),
+    ).then((result) {
+      if (result == null || !context.mounted) return;
+      if (result.isEmpty) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const AIChatScreen(),
+          ),
+        );
+      } else {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => AIChatScreen(conversationId: result),
+          ),
+        );
+      }
+    });
+  }
+
   Widget _buildSearchCard() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          icon: Icon(Icons.auto_awesome, color: Colors.grey[400], size: 20),
-          hintText: 'Ask about your spending...',
-          hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
-          border: InputBorder.none,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: TextField(
+              controller: _searchController,
+              minLines: 1,
+              maxLines: 5,
+              onSubmitted: _openAIChat,
+              textInputAction: TextInputAction.send,
+              decoration: InputDecoration(
+                hintText: 'Ask about your spending...',
+                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
+                border: InputBorder.none,
+              ),
+              style: const TextStyle(fontSize: 15),
+            ),
+          ),
         ),
-        style: const TextStyle(fontSize: 15),
-      ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () => _openAIChat(_searchController.text),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: Icon(Icons.auto_awesome, color: Colors.grey[400], size: 22),
+          ),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: _openConversationHistory,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: Icon(Icons.history, color: Colors.grey[600], size: 22),
+          ),
+        ),
+      ],
     );
   }
 

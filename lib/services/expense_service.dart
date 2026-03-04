@@ -226,6 +226,18 @@ class ExpenseService {
     return snapshot.docs.map((doc) => Expense.fromFirestore(doc)).toList();
   }
 
+  /// Query expenses between two arbitrary dates
+  Future<List<Expense>> getExpensesBetween(
+      String uid, DateTime start, DateTime end) async {
+    final snapshot = await _expensesRef(uid)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('date', isLessThan: Timestamp.fromDate(end))
+        .orderBy('date', descending: true)
+        .get();
+
+    return snapshot.docs.map((doc) => Expense.fromFirestore(doc)).toList();
+  }
+
   DateTime _getMonday(DateTime date) {
     final daysFromMonday = date.weekday - 1;
     return DateTime(date.year, date.month, date.day - daysFromMonday);

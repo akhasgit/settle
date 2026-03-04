@@ -83,4 +83,31 @@ class SavingsService {
     if (!doc.exists) return null;
     return SavingsItem.fromFirestore(doc);
   }
+
+  /// Find a savings goal by name (case-insensitive fuzzy match) and add money to it
+  Future<void> addContributionByName(
+      String uid, String goalName, double amount) async {
+    final snapshot = await _savingsRef(uid).get();
+    final items =
+        snapshot.docs.map((d) => SavingsItem.fromFirestore(d)).toList();
+
+    final lowerGoal = goalName.toLowerCase();
+    SavingsItem? match;
+    for (final item in items) {
+      if (item.name.toLowerCase() == lowerGoal) {
+        match = item;
+        break;
+      }
+    }
+    match ??= items.cast<SavingsItem?>().firstWhere(
+          (item) => item!.name.toLowerCase().contains(lowerGoal),
+          orElse: () => null,
+        );
+
+    if (match == null) {
+      throw Exception('No savings goal matching "$goalName"');
+    }
+
+    await addMoney(uid, match.id, amount);
+  }
 }

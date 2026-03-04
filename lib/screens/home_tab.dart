@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/expense_service.dart';
 import '../widgets/set_budget_bottom_sheet.dart';
 import 'expense_list_screen.dart';
+import 'ai_chat_screen.dart';
+import 'conversation_list_screen.dart';
 
 class HomeTab extends StatefulWidget {
   final String name;
@@ -21,11 +23,39 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   final _expenseService = ExpenseService();
   late final String _uid;
+  final _searchController = TextEditingController();
+  final _scrollController = ScrollController();
+  final _searchFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _uid = FirebaseAuth.instance.currentUser!.uid;
+    _searchFocusNode.addListener(_onSearchFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _searchFocusNode.removeListener(_onSearchFocusChange);
+    _searchFocusNode.dispose();
+    _scrollController.dispose();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchFocusChange() {
+    if (_searchFocusNode.hasFocus && _scrollController.hasClients) {
+      // Wait for keyboard to open and layout to update with bottom padding
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (!mounted || !_scrollController.hasClients) return;
+        final position = _scrollController.position;
+        _scrollController.animateTo(
+          position.maxScrollExtent,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      });
+    }
   }
 
   void _openExpenseList(String period) {
@@ -42,6 +72,99 @@ class _HomeTabState extends State<HomeTab> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => SetBudgetBottomSheet(uid: _uid),
+    );
+  }
+
+  void _openAIChat(String text) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+    _searchController.clear();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => AIChatScreen(initialMessage: trimmed),
+      ),
+    );
+  }
+
+  void _openConversationHistory() {
+    Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (context) => const ConversationListScreen(),
+      ),
+    ).then((result) {
+      if (result == null || !context.mounted) return;
+      if (result.isEmpty) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const AIChatScreen(),
+          ),
+        );
+      } else {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => AIChatScreen(conversationId: result),
+          ),
+        );
+      }
+    });
+  }
+
+  Widget _buildSearchCard() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: TextField(
+              controller: _searchController,
+              focusNode: _searchFocusNode,
+              minLines: 1,
+              maxLines: 5,
+              onSubmitted: _openAIChat,
+              textInputAction: TextInputAction.send,
+              decoration: InputDecoration(
+                hintText: 'Ask about your spending...',
+                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
+                border: InputBorder.none,
+              ),
+              style: const TextStyle(fontSize: 15),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () => _openAIChat(_searchController.text),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: Icon(Icons.auto_awesome, color: Colors.grey[400], size: 22),
+          ),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: _openConversationHistory,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: Icon(Icons.history, color: Colors.grey[600], size: 22),
+          ),
+        ),
+      ],
     );
   }
 
@@ -74,8 +197,10 @@ class _HomeTabState extends State<HomeTab> {
             (weeklyBudget != null && weeklyBudget > 0) &&
             (monthlyBudget != null && monthlyBudget > 0);
 
+        final bottomInset = MediaQuery.of(context).viewInsets.bottom;
         return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          controller: _scrollController,
+          padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + bottomInset),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -136,6 +261,8 @@ class _HomeTabState extends State<HomeTab> {
                   budget: monthlyBudget,
                 ),
               ),
+              const SizedBox(height: 16),
+              _buildSearchCard(),
               if (!hasAllBudgets) ...[
                 const SizedBox(height: 16),
                 SizedBox(

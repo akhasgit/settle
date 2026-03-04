@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.settle</string>
+	<string>app.settlefinance.mobile</string>
 	<key>PROJECT_ID</key>
 	<string>flashcardme-9beb0</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:457646309364:ios:fa2317d744dfdc592103a1</string>
+	<string>1:457646309364:ios:56e37bd739a394f32103a1</string>
 </dict>
 </plist>

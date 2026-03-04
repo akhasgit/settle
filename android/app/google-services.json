@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:457646309364:android:5a5456e85cef8a062103a1",
+        "android_client_info": {
+          "package_name": "app.settlefinance.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBZSmHezPgo7Tndj4ahw8Saf-nN10yRCUg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:457646309364:android:11d1e6cc8ce658d22103a1",
         "android_client_info": {
           "package_name": "com.example.settle"

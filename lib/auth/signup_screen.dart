@@ -57,16 +57,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
         });
       }
       
-      // User is now logged in - pop the sign-up screen
-      // AuthWrapper will automatically navigate to MainScreen
-      // MainScreen will check if profile setup is needed
+      // User is now logged in - pop back to root so AuthWrapper shows MainScreen
+      // (Auth state has already updated; use popUntil in case we were pushed from LoginScreen)
       if (mounted) {
-        Navigator.pop(context);
+        Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
       if (mounted) {
+        final message = e is String ? e : e.toString();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red.shade700,
+            duration: const Duration(seconds: 5),
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {

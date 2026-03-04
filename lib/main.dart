@@ -160,6 +160,7 @@ class _MainScreenState extends State<MainScreen>
     final uid = user.uid;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           // Main content with TabBarView
@@ -282,10 +283,10 @@ class _MainScreenState extends State<MainScreen>
                     ],
                   ),
                 ),
-                // IndexedStack keeps all tabs mounted so state and scroll position persist
+                // TabBarView allows swiping between tabs and stays in sync with TabController
                 Expanded(
-                  child: IndexedStack(
-                    index: _tabController.index,
+                  child: TabBarView(
+                    controller: _tabController,
                     children: [
                       HomeTab(name: name, username: username),
                       const SavingsTab(),

@@ -1,11 +1,45 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
+const Anthropic = require("@anthropic-ai/sdk").default;
 
 initializeApp();
 
 const db = getFirestore();
+const anthropicKey = defineSecret("ANTHROPIC_API_KEY");
+
+/**
+ * Proxy for Anthropic Claude API — keeps the API key server-side.
+ * Flutter calls this via FirebaseFunctions.instance.httpsCallable('claudeProxy').
+ */
+exports.claudeProxy = onCall(
+  { secrets: [anthropicKey], timeoutSeconds: 60 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Login required");
+    }
+
+    const client = new Anthropic({ apiKey: anthropicKey.value() });
+    const { systemPrompt, tools, messages } = request.data;
+
+    try {
+      const response = await client.messages.create({
+        model: "claude-3-haiku-20240307",
+        max_tokens: 1024,
+        system: systemPrompt,
+        tools: tools,
+        messages: messages,
+      });
+      return response;
+    } catch (err) {
+      console.error("Claude API error:", err);
+      throw new HttpsError("internal", "Claude API call failed");
+    }
+  }
+);
 
 /**
  * Daily CRON job — runs every day at midnight UTC.

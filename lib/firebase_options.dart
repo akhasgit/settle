@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -51,7 +48,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBZSmHezPgo7Tndj4ahw8Saf-nN10yRCUg',
-    appId: '1:457646309364:android:11d1e6cc8ce658d22103a1',
+    appId: '1:457646309364:android:5a5456e85cef8a062103a1',
     messagingSenderId: '457646309364',
     projectId: 'flashcardme-9beb0',
     storageBucket: 'flashcardme-9beb0.firebasestorage.app',
@@ -59,10 +56,21 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyCi26lX7RicDXX364xyhO5qUrVJCbToZiI',
-    appId: '1:457646309364:ios:fa2317d744dfdc592103a1',
+    appId: '1:457646309364:ios:56e37bd739a394f32103a1',
     messagingSenderId: '457646309364',
     projectId: 'flashcardme-9beb0',
     storageBucket: 'flashcardme-9beb0.firebasestorage.app',
-    iosBundleId: 'com.example.settle',
+    iosBundleId: 'app.settlefinance.mobile',
   );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyA1iTCzb7vuBJeXqZGBo6ncgt4ulC5LjZo',
+    appId: '1:457646309364:web:2af3388b0df9f7802103a1',
+    messagingSenderId: '457646309364',
+    projectId: 'flashcardme-9beb0',
+    authDomain: 'flashcardme-9beb0.firebaseapp.com',
+    storageBucket: 'flashcardme-9beb0.firebasestorage.app',
+    measurementId: 'G-5SZHNVGZCJ',
+  );
+
 }
