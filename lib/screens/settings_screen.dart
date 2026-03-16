@@ -1,9 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../auth/auth_service.dart';
+import '../services/bank_service.dart';
 import 'profile_screen.dart';
+import 'bank_connection_screen.dart';
 
-class SettingsScreen extends StatelessWidget {
+class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
+
+  @override
+  State<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends State<SettingsScreen> {
+  final BankService _bankService = BankService();
+
+  String? get _uid => FirebaseAuth.instance.currentUser?.uid;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +67,8 @@ class SettingsScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
+            _buildBankingSection(),
+            const SizedBox(height: 24),
             _buildSettingsSection(
               title: 'Preferences',
               children: [
@@ -100,6 +114,137 @@ class SettingsScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildBankingSection() {
+    final uid = _uid;
+    if (uid == null) return const SizedBox.shrink();
+
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: _bankService.getConnections(uid),
+      builder: (context, snapshot) {
+        final connections = snapshot.data ?? [];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSettingsSection(
+              title: 'Banking',
+              children: [
+                // Show each connected institution
+                ...connections.map(
+                  (conn) => _buildConnectedBankTile(
+                    uid: uid,
+                    connectionId: conn['connectionId'] as String,
+                    institutionName: conn['institutionName'] as String? ?? 'Bank',
+                  ),
+                ),
+                // "Add account" tile always visible
+                _buildSettingsTile(
+                  icon: Icons.account_balance_outlined,
+                  title: connections.isEmpty
+                      ? 'Connect Bank Account'
+                      : 'Connect Another Account',
+                  subtitle: connections.isEmpty
+                      ? 'Auto-log DBS/POSB transactions'
+                      : null,
+                  onTap: () async {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const BankConnectionScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildConnectedBankTile({
+    required String uid,
+    required String connectionId,
+    required String institutionName,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle, color: Colors.green, size: 24),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$institutionName Connected',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Transactions are synced automatically',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF757575)),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () => _confirmDisconnect(uid, connectionId, institutionName),
+            child: const Icon(Icons.link_off, color: Color(0xFF757575), size: 22),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmDisconnect(
+    String uid,
+    String connectionId,
+    String institutionName,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Disconnect Bank'),
+        content: Text(
+          'Stop syncing transactions from $institutionName?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Disconnect', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _bankService.disconnectBank(uid, connectionId);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$institutionName disconnected')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to disconnect. Please try again.')),
+          );
+        }
+      }
+    }
   }
 
   Widget _buildSettingsSection({

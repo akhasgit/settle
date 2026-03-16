@@ -1,15 +1,18 @@
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
 const { initializeApp } = require("firebase-admin/app");
 const { getFirestore } = require("firebase-admin/firestore");
 const Anthropic = require("@anthropic-ai/sdk").default;
+const crypto = require("crypto");
 
 initializeApp();
 
 const db = getFirestore();
 const anthropicKey = defineSecret("ANTHROPIC_API_KEY");
+const finverseApiKey = defineSecret("FINVERSE_API_KEY");
+const finverseWebhookSecret = defineSecret("FINVERSE_WEBHOOK_SECRET");
 
 /**
  * Proxy for Anthropic Claude API — keeps the API key server-side.
@@ -184,5 +187,159 @@ exports.onExpenseCreated = onDocumentCreated(
         transaction.update(userRef, { expenseSummary: summary });
       }
     });
+  }
+);
+
+/**
+ * HTTP endpoint for Finverse to POST transaction webhook events.
+ * Verifies the HMAC signature, calls Claude to categorise the transaction,
+ * and writes an Expense document to Firestore for the matching user.
+ */
+exports.bankWebhookHandler = onRequest(
+  { secrets: [finverseWebhookSecret, anthropicKey] },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      return res.status(405).send("Method not allowed");
+    }
+
+    // Verify Finverse HMAC-SHA256 signature
+    const signature = req.headers["x-finverse-signature"];
+    const rawBody = JSON.stringify(req.body);
+    const expectedSig = crypto
+      .createHmac("sha256", finverseWebhookSecret.value())
+      .update(rawBody)
+      .digest("hex");
+
+    if (!signature || signature !== expectedSig) {
+      console.error("Invalid webhook signature");
+      return res.status(401).send("Invalid signature");
+    }
+
+    const { event_type, data, metadata } = req.body;
+
+    // Only process new transaction events
+    if (event_type !== "transaction.created") {
+      return res.status(200).send("Event ignored");
+    }
+
+    const uid = metadata?.settle_uid;
+    if (!uid) {
+      console.error("No settle_uid in webhook metadata");
+      return res.status(400).send("Missing user ID");
+    }
+
+    const tx = data?.transaction;
+    if (!tx) {
+      return res.status(400).send("Missing transaction data");
+    }
+
+    // Only auto-log outgoing payments (debits)
+    if (tx.type !== "debit") {
+      return res.status(200).send("Non-debit transaction ignored");
+    }
+
+    try {
+      // Use Claude to infer a clean name and expense tag from the raw bank description
+      const client = new Anthropic({ apiKey: anthropicKey.value() });
+      const categorisation = await client.messages.create({
+        model: "claude-3-haiku-20240307",
+        max_tokens: 100,
+        system:
+          'You are a financial transaction categoriser. Given a raw bank transaction description and amount, return ONLY valid JSON with no extra text: {"name": "<concise 2-4 word merchant name>", "tag": "<one of: Food, Transport, Shopping, Entertainment, Bills, Health, Travel, Other>"}',
+        messages: [
+          {
+            role: "user",
+            content: `Description: "${tx.description}", Amount: ${tx.amount} ${tx.currency}`,
+          },
+        ],
+      });
+
+      let name = tx.description;
+      let tag = "Other";
+      try {
+        const parsed = JSON.parse(categorisation.content[0].text);
+        name = parsed.name || name;
+        tag = parsed.tag || tag;
+      } catch (_) {
+        console.warn("Claude categorisation parse failed — using raw description");
+      }
+
+      // Write Expense to Firestore using the same schema as the rest of the app
+      const expensesRef = db.collection("users").doc(uid).collection("expenses");
+      await expensesRef.add({
+        amount: Math.abs(tx.amount),
+        name: name,
+        tag: tag,
+        currency: tx.currency || "SGD",
+        date: new Date(tx.date),
+        createdAt: new Date(),
+        splitWith: [],
+        splitMode: "equal",
+        customAmounts: {},
+        omittedUsernames: [],
+        source: "bank_sync",
+        bankTransactionId: tx.id,
+      });
+
+      // Update the bank connection's lastSyncAt timestamp
+      const connectionsRef = db.collection("users").doc(uid).collection("bankConnections");
+      const connectionSnap = await connectionsRef
+        .where("connectionId", "==", data.connection_id)
+        .limit(1)
+        .get();
+      if (!connectionSnap.empty) {
+        await connectionSnap.docs[0].ref.update({ lastSyncAt: new Date() });
+      }
+
+      console.log(
+        `Bank sync: logged "${name}" (${tag}) — ${tx.amount} ${tx.currency} for user ${uid}`
+      );
+      return res.status(200).send("OK");
+    } catch (err) {
+      console.error("bankWebhookHandler error:", err);
+      return res.status(500).send("Internal error");
+    }
+  }
+);
+
+/**
+ * Callable function for Flutter to request a Finverse Link token.
+ * The token is passed to the WebView to launch the bank connection flow.
+ */
+exports.createFinverseLink = onCall(
+  { secrets: [finverseApiKey] },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Login required");
+    }
+
+    const uid = request.auth.uid;
+
+    try {
+      const response = await fetch("https://api.finverse.net/link/customer_app/token", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "finverse-api-key": finverseApiKey.value(),
+        },
+        body: JSON.stringify({
+          customer_app_id: "settle",
+          metadata: { settle_uid: uid },
+        }),
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("Finverse link token error:", errText);
+        throw new HttpsError("internal", "Failed to create bank link token");
+      }
+
+      const data = await response.json();
+      return { linkToken: data.link_token };
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      console.error("createFinverseLink error:", err);
+      throw new HttpsError("internal", "Bank connection service unavailable");
+    }
   }
 );
